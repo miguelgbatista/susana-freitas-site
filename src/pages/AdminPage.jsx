@@ -15,10 +15,82 @@ export default function AdminPage() {
   // ─── Form ───
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [formData, setFormData] = useState({ name: '', price: '' });
+  const [formData, setFormData] = useState({ name: '', price: '', original_price: '', category: 'Blusas' });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // ─── Dynamic Categories ───
+  const [categoriesOptions, setCategoriesOptions] = useState([
+    'Blusas', 'Vestidos', 'Calças', 'Saias', 'Conjuntos & Coletes', 'Tricôs'
+  ]);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [editingCat, setEditingCat] = useState(null);
+  const [editCatName, setEditCatName] = useState('');
+
+  // Save/Load categories from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('sf_categories');
+    if (saved) {
+      try {
+        setCategoriesOptions(JSON.parse(saved));
+      } catch (e) {
+        console.error('Erro ao ler categorias salvas:', e);
+      }
+    }
+  }, []);
+
+  const saveCategories = (newCats) => {
+    setCategoriesOptions(newCats);
+    localStorage.setItem('sf_categories', JSON.stringify(newCats));
+  };
+
+  const handleAddCategory = (e) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+    const trimmed = newCatName.trim();
+    if (categoriesOptions.includes(trimmed)) {
+      showToast('Esta categoria já existe.', 'error');
+      return;
+    }
+    const updated = [...categoriesOptions, trimmed];
+    saveCategories(updated);
+    setNewCatName('');
+    showToast('Categoria criada com sucesso!');
+  };
+
+  const handleRenameCategory = (oldName) => {
+    if (!editCatName.trim() || editCatName.trim() === oldName) {
+      setEditingCat(null);
+      return;
+    }
+    const trimmed = editCatName.trim();
+    const updated = categoriesOptions.map(c => c === oldName ? trimmed : c);
+    saveCategories(updated);
+    
+    // update current form if selected
+    if (formData.category === oldName) {
+      setFormData(f => ({ ...f, category: trimmed }));
+    }
+
+    setEditingCat(null);
+    setEditCatName('');
+    showToast('Categoria renomeada!');
+  };
+
+  const handleDeleteCategory = (catToDelete) => {
+    if (categoriesOptions.length <= 1) {
+      showToast('Você deve manter pelo menos uma categoria.', 'error');
+      return;
+    }
+    const updated = categoriesOptions.filter(c => c !== catToDelete);
+    saveCategories(updated);
+    if (formData.category === catToDelete) {
+      setFormData(f => ({ ...f, category: updated[0] }));
+    }
+    showToast('Categoria removida.');
+  };
 
   // ─── Delete confirm ───
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -153,7 +225,21 @@ export default function AdminPage() {
     return data.publicUrl;
   };
 
-  // ─── Save (create or update) ───
+  // ─── Delete ───
+  const handleDelete = async (id) => {
+    setDeleting(true);
+    const { error } = await supabase.from('produtos').delete().eq('id', id);
+
+    if (error) {
+      showToast('Erro ao excluir produto.', 'error');
+    } else {
+      showToast('Produto excluído.');
+    }
+
+    setDeleteConfirm(null);
+    setDeleting(false);
+    fetchProducts();
+  };
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -171,6 +257,8 @@ export default function AdminPage() {
           .update({
             name: formData.name,
             price: formData.price,
+            original_price: formData.original_price || null,
+            category: formData.category,
             image_url: imageUrl,
           })
           .eq('id', editingProduct.id);
@@ -187,6 +275,8 @@ export default function AdminPage() {
           .insert({
             name: formData.name,
             price: formData.price,
+            original_price: formData.original_price || null,
+            category: formData.category,
             image_url: imageUrl,
             sort_order: maxOrder + 1,
           });
@@ -205,26 +295,15 @@ export default function AdminPage() {
     setSaving(false);
   };
 
-  // ─── Delete ───
-  const handleDelete = async (id) => {
-    setDeleting(true);
-    const { error } = await supabase.from('produtos').delete().eq('id', id);
-
-    if (error) {
-      showToast('Erro ao excluir produto.', 'error');
-    } else {
-      showToast('Produto excluído.');
-    }
-
-    setDeleteConfirm(null);
-    setDeleting(false);
-    fetchProducts();
-  };
-
   // ─── Edit ───
   const startEdit = (product) => {
     setEditingProduct(product);
-    setFormData({ name: product.name, price: product.price });
+    setFormData({
+      name: product.name,
+      price: product.price,
+      original_price: product.original_price || product.price_from || '',
+      category: product.category || 'Blusas',
+    });
     setImagePreview(product.image_url);
     setImageFile(null);
     setShowForm(true);
@@ -234,7 +313,7 @@ export default function AdminPage() {
   const resetForm = () => {
     setShowForm(false);
     setEditingProduct(null);
-    setFormData({ name: '', price: '' });
+    setFormData({ name: '', price: '', original_price: '', category: 'Blusas' });
     setImageFile(null);
     setImagePreview('');
   };
@@ -353,17 +432,26 @@ export default function AdminPage() {
         {activeTab === 'catalog' ? (
           <>
             {/* ─── Actions Bar ─── */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
               <p className="font-sans text-sm text-[#7A6051]">
                 {loading ? 'Carregando...' : `${products.length} ${products.length === 1 ? 'produto' : 'produtos'}`}
               </p>
-              <button
-                onClick={() => { resetForm(); setShowForm(true); }}
-                className="flex items-center gap-2 bg-[#1F1B18] text-[#F7F3EE] px-5 py-3 font-sans text-xs tracking-[0.15em] uppercase hover:bg-[#2F2622] transition-colors"
-              >
-                <Plus size={14} />
-                Nova Peça
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowCategoryManager(true)}
+                  className="flex items-center gap-2 border border-[#1F1B18]/20 text-[#1F1B18] px-4 py-3 font-sans text-xs tracking-[0.15em] uppercase hover:bg-white transition-colors"
+                >
+                  <Pencil size={14} />
+                  Gerenciar Categorias
+                </button>
+                <button
+                  onClick={() => { resetForm(); setShowForm(true); }}
+                  className="flex items-center gap-2 bg-[#1F1B18] text-[#F7F3EE] px-5 py-3 font-sans text-xs tracking-[0.15em] uppercase hover:bg-[#2F2622] transition-colors"
+                >
+                  <Plus size={14} />
+                  Nova Peça
+                </button>
+              </div>
             </div>
 
       {/* ─── Product Grid ─── */}
@@ -493,19 +581,50 @@ export default function AdminPage() {
                 />
               </div>
 
-              {/* Price */}
+              {/* Category */}
               <div>
                 <label className="block font-sans text-[11px] tracking-[0.15em] uppercase text-[#7A6051] mb-2">
-                  Preço
+                  Categoria
                 </label>
-                <input
-                  type="text"
-                  value={formData.price}
-                  onChange={(e) => setFormData(f => ({ ...f, price: e.target.value }))}
-                  placeholder="Ex: R$ 579,90"
-                  required
-                  className="w-full border border-[#C2AE98]/30 px-4 py-3 font-sans text-sm text-[#1F1B18] placeholder:text-[#7A6051]/30 focus:outline-none focus:border-[#7A6051]/50 transition-colors bg-transparent"
-                />
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData(f => ({ ...f, category: e.target.value }))}
+                  className="w-full border border-[#C2AE98]/30 px-4 py-3 font-sans text-sm text-[#1F1B18] focus:outline-none focus:border-[#7A6051]/50 transition-colors bg-transparent cursor-pointer"
+                >
+                  {categoriesOptions.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Prices: De e Por */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-sans text-[11px] tracking-[0.15em] uppercase text-[#7A6051] mb-2">
+                    Preço Original ("De") <span className="text-gray-400 font-normal lowercase">(opcional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.original_price}
+                    onChange={(e) => setFormData(f => ({ ...f, original_price: e.target.value }))}
+                    placeholder="Ex: R$ 649,90"
+                    className="w-full border border-[#C2AE98]/30 px-4 py-3 font-sans text-sm text-[#1F1B18] placeholder:text-[#7A6051]/30 focus:outline-none focus:border-[#7A6051]/50 transition-colors bg-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-sans text-[11px] tracking-[0.15em] uppercase text-[#7A6051] mb-2">
+                    Preço de Venda ("Por")
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.price}
+                    onChange={(e) => setFormData(f => ({ ...f, price: e.target.value }))}
+                    placeholder="Ex: R$ 579,90"
+                    required
+                    className="w-full border border-[#C2AE98]/30 px-4 py-3 font-sans text-sm text-[#1F1B18] placeholder:text-[#7A6051]/30 focus:outline-none focus:border-[#7A6051]/50 transition-colors bg-transparent"
+                  />
+                </div>
               </div>
 
               {/* Actions */}
@@ -657,6 +776,93 @@ export default function AdminPage() {
           </div>
         )}
       </main>
+
+      {/* ═══════════════════════════════════════════════ */}
+      {/*  CATEGORY MANAGER MODAL                         */}
+      {/* ═══════════════════════════════════════════════ */}
+      {showCategoryManager && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] px-4 py-8" onClick={() => setShowCategoryManager(false)}>
+          <div
+            className="bg-white w-full max-w-md max-h-[85vh] overflow-y-auto p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-[#EAE1D7]">
+              <h2 className="font-serif text-xl text-[#1F1B18]">Gerenciar Categorias</h2>
+              <button onClick={() => setShowCategoryManager(false)} className="text-[#7A6051] hover:text-[#1F1B18]">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Criar nova */}
+            <form onSubmit={handleAddCategory} className="flex gap-2 mb-6">
+              <input
+                type="text"
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                placeholder="Nome da nova categoria"
+                className="flex-1 border border-[#C2AE98]/40 px-3 py-2 text-sm font-sans focus:outline-none focus:border-[#1F1B18]"
+              />
+              <button
+                type="submit"
+                className="bg-[#1F1B18] text-[#F7F3EE] px-4 py-2 text-xs font-sans uppercase tracking-wider hover:bg-[#2F2622]"
+              >
+                Criar
+              </button>
+            </form>
+
+            {/* Lista de Categorias */}
+            <div className="space-y-3">
+              {categoriesOptions.map((cat) => (
+                <div key={cat} className="flex items-center justify-between p-3 bg-[#FAF7F2] border border-[#EAE1D7] rounded-lg">
+                  {editingCat === cat ? (
+                    <div className="flex items-center gap-2 flex-1 mr-2">
+                      <input
+                        type="text"
+                        value={editCatName}
+                        onChange={(e) => setEditCatName(e.target.value)}
+                        className="flex-1 border border-[#1F1B18] px-2 py-1 text-sm font-sans"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleRenameCategory(cat)}
+                        className="text-emerald-700 hover:text-emerald-900 text-xs font-bold font-sans"
+                      >
+                        Salvar
+                      </button>
+                      <button
+                        onClick={() => setEditingCat(null)}
+                        className="text-gray-500 text-xs font-sans"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="font-sans text-sm text-[#1F1B18] font-medium">{cat}</span>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => { setEditingCat(cat); setEditCatName(cat); }}
+                          className="text-[#7A6051] hover:text-[#1F1B18]"
+                          title="Renomear"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(cat)}
+                          className="text-red-500 hover:text-red-700"
+                          title="Excluir"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Inline Styles for Toast Animation ─── */}
       <style>{`

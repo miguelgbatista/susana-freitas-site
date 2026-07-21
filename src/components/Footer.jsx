@@ -20,6 +20,7 @@ export default function Footer() {
           <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-4 font-sans text-xs tracking-[0.2em] uppercase text-white font-bold">
             <Link to="/catalogo" className="hover:text-brand-fendi transition-colors">Catálogo</Link>
             <a href="#" className="hover:text-brand-fendi transition-colors">Atendimento WhatsApp</a>
+            <Link to="/admin" className="hover:text-brand-fendi transition-colors text-white/40">Área Admin</Link>
           </div>
 
           <div className="flex items-center space-x-6 text-white/95">
