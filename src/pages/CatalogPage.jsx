@@ -35,6 +35,7 @@ export default function CatalogPage() {
             price: p.price,
             original_price: p.original_price || p.price_from || null,
             category: p.category || 'Outros',
+            is_opportunity: p.is_opportunity || false,
             image: p.image_url,
           })));
         }
@@ -124,7 +125,7 @@ export default function CatalogPage() {
               >
                 {/* Image Box */}
                 <div className="relative aspect-[3/4] overflow-hidden bg-brand-linen mb-6 rounded-2xl">
-                  {product.original_price && (
+                  {product.is_opportunity && (
                     <span className="absolute top-3 right-3 z-10 bg-brand-burgundy text-white font-sans text-[10px] uppercase tracking-widest px-3 py-1 rounded-full shadow-sm font-medium">
                       Oportunidade
                     </span>

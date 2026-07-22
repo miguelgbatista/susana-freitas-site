@@ -15,7 +15,7 @@ export default function AdminPage() {
   // ─── Form ───
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [formData, setFormData] = useState({ name: '', price: '', original_price: '', category: 'Blusas' });
+  const [formData, setFormData] = useState({ name: '', price: '', original_price: '', category: 'Blusas', is_opportunity: false });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [saving, setSaving] = useState(false);
@@ -273,6 +273,7 @@ export default function AdminPage() {
             price: formData.price,
             original_price: formData.original_price || null,
             category: formData.category,
+            is_opportunity: formData.is_opportunity,
             image_url: imageUrl,
           })
           .eq('id', editingProduct.id);
@@ -291,6 +292,7 @@ export default function AdminPage() {
             price: formData.price,
             original_price: formData.original_price || null,
             category: formData.category,
+            is_opportunity: formData.is_opportunity,
             image_url: imageUrl,
             sort_order: maxOrder + 1,
           });
@@ -317,6 +319,7 @@ export default function AdminPage() {
       price: product.price,
       original_price: product.original_price || product.price_from || '',
       category: product.category || 'Blusas',
+      is_opportunity: product.is_opportunity || false,
     });
     setImagePreview(product.image_url);
     setImageFile(null);
@@ -327,7 +330,7 @@ export default function AdminPage() {
   const resetForm = () => {
     setShowForm(false);
     setEditingProduct(null);
-    setFormData({ name: '', price: '', original_price: '', category: 'Blusas' });
+    setFormData({ name: '', price: '', original_price: '', category: 'Blusas', is_opportunity: false });
     setImageFile(null);
     setImagePreview('');
   };
@@ -491,6 +494,11 @@ export default function AdminPage() {
               <div key={product.id} className="group relative">
                 {/* Image */}
                 <div className="relative aspect-[3/4] bg-[#EAE1D7] overflow-hidden mb-3">
+                  {product.is_opportunity && (
+                    <span className="absolute top-2 right-2 z-10 bg-[#6E2F3A] text-white font-sans text-[9px] uppercase tracking-widest px-2 py-0.5 rounded shadow-sm font-medium">
+                      Oportunidade
+                    </span>
+                  )}
                   {product.image_url ? (
                     <img
                       src={product.image_url}
@@ -616,6 +624,20 @@ export default function AdminPage() {
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Toggle Oportunidade */}
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="is_opportunity"
+                  checked={formData.is_opportunity}
+                  onChange={(e) => setFormData(f => ({ ...f, is_opportunity: e.target.checked }))}
+                  className="w-4 h-4 text-[#7A6051] border-[#C2AE98]/30 rounded focus:ring-[#7A6051] cursor-pointer"
+                />
+                <label htmlFor="is_opportunity" className="font-sans text-sm text-[#1F1B18] cursor-pointer select-none">
+                  Exibir selo "Oportunidade" no site e no painel
+                </label>
               </div>
 
               {/* Prices: De e Por */}
