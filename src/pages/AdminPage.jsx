@@ -289,7 +289,7 @@ export default function AdminPage() {
       fetchProducts();
     } catch (err) {
       console.error('Erro ao salvar:', err);
-      showToast('Erro ao salvar. Tente novamente.', 'error');
+      showToast(`Erro ao salvar: ${err.message || 'Tente novamente.'}`, 'error');
     }
 
     setSaving(false);
@@ -510,7 +510,14 @@ export default function AdminPage() {
 
                 {/* Info */}
                 <h3 className="font-serif text-sm text-[#1F1B18] leading-snug line-clamp-2">{product.name}</h3>
-                <p className="font-sans text-xs text-[#7A6051] mt-1">{product.price}</p>
+                {product.original_price ? (
+                  <p className="font-sans text-xs mt-1 flex items-center gap-1.5">
+                    <span className="line-through text-[#7A6051]/50">{product.original_price}</span>
+                    <span className="text-[#1F1B18] font-medium">{product.price}</span>
+                  </p>
+                ) : (
+                  <p className="font-sans text-xs text-[#7A6051] mt-1">{product.price}</p>
+                )}
               </div>
             ))}
           </div>

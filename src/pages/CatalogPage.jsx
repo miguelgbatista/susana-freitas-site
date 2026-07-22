@@ -12,7 +12,9 @@ export default function CatalogPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
 
-  const categories = ['Todos', 'Blusas', 'Vestidos', 'Calças', 'Saias', 'Conjuntos & Coletes', 'Tricôs'];
+  const baseCategories = ['Blusas', 'Vestidos', 'Calças', 'Saias', 'Conjuntos & Coletes', 'Tricôs'];
+  const dynamicCategories = products.map(p => p.category).filter(Boolean);
+  const categories = ['Todos', ...Array.from(new Set([...baseCategories, ...dynamicCategories]))];
 
   // Fetch products from Supabase, fallback to static data
   useEffect(() => {
