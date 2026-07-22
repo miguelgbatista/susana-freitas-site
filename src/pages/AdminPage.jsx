@@ -60,7 +60,7 @@ export default function AdminPage() {
     showToast('Categoria criada com sucesso!');
   };
 
-  const handleRenameCategory = (oldName) => {
+  const handleRenameCategory = async (oldName) => {
     if (!editCatName.trim() || editCatName.trim() === oldName) {
       setEditingCat(null);
       return;
@@ -76,7 +76,21 @@ export default function AdminPage() {
 
     setEditingCat(null);
     setEditCatName('');
-    showToast('Categoria renomeada!');
+    showToast('Atualizando produtos...');
+
+    // Update in Supabase
+    const { error } = await supabase
+      .from('produtos')
+      .update({ category: trimmed })
+      .eq('category', oldName);
+
+    if (error) {
+      console.error(error);
+      showToast('Erro ao atualizar produtos.', 'error');
+    } else {
+      showToast('Categoria renomeada!');
+      fetchProducts();
+    }
   };
 
   const handleDeleteCategory = (catToDelete) => {
