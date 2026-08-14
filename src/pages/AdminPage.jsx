@@ -125,6 +125,16 @@ export default function AdminPage() {
   // ─── Tabs ───
   const [activeTab, setActiveTab] = useState('catalog'); // 'catalog' | 'home'
 
+  // ─── Admin Category Filter ───
+  const [selectedAdminCategory, setSelectedAdminCategory] = useState('Todas');
+  
+  const visibleProducts = selectedAdminCategory === 'Todas'
+    ? products
+    : products.filter(p => (p.category || '').toLowerCase() === selectedAdminCategory.toLowerCase());
+
+  const dynamicAdminCategories = products.map(p => p.category).filter(Boolean);
+  const displayAdminCategories = ['Todas', ...Array.from(new Set([...categoriesOptions, ...dynamicAdminCategories]))];
+
   // ─── Home Config ───
   const [homeConfig, setHomeConfig] = useState({});
   const [configLoading, setConfigLoading] = useState(false);
@@ -288,24 +298,32 @@ export default function AdminPage() {
       return;
     }
 
-    const newProducts = [...products];
-    const draggedItem = newProducts[draggedIndex];
-    newProducts.splice(draggedIndex, 1);
-    newProducts.splice(dropIndex, 0, draggedItem);
+    const newVisibleProducts = [...visibleProducts];
+    const draggedItem = newVisibleProducts[draggedIndex];
+    newVisibleProducts.splice(draggedIndex, 1);
+    newVisibleProducts.splice(dropIndex, 0, draggedItem);
 
-    const updatedProducts = newProducts.map((p, i) => ({
+    const originalSortOrders = visibleProducts.map(p => p.sort_order || 0).sort((a, b) => a - b);
+
+    const updatedVisibleProducts = newVisibleProducts.map((p, i) => ({
       ...p,
-      sort_order: i
+      sort_order: originalSortOrders[i]
     }));
 
-    setProducts(updatedProducts);
+    const updatedProductsMap = new Map(updatedVisibleProducts.map(p => [p.id, p]));
+    const finalProducts = products.map(p => updatedProductsMap.has(p.id) ? updatedProductsMap.get(p.id) : p);
+    
+    // Sort finalProducts by sort_order just to be safe
+    finalProducts.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+    setProducts(finalProducts);
     setDragOverIndex(null);
     setDraggedIndex(null);
     showToast('Salvando nova ordem...');
 
     try {
       await Promise.all(
-        updatedProducts.map(p =>
+        updatedVisibleProducts.map(p =>
           supabase.from('produtos').update({ sort_order: p.sort_order }).eq('id', p.id)
         )
       );
@@ -533,26 +551,43 @@ export default function AdminPage() {
               </div>
             </div>
 
+            {/* ─── Categories Filter ─── */}
+            <div className="flex items-center flex-wrap gap-2 mb-8">
+              {displayAdminCategories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedAdminCategory(cat)}
+                  className={`px-4 py-2 font-sans text-[10px] tracking-wider uppercase transition-colors rounded-full ${
+                    selectedAdminCategory === cat
+                      ? 'bg-[#1F1B18] text-[#F7F3EE]'
+                      : 'bg-[#EAE1D7]/50 text-[#7A6051] hover:bg-[#EAE1D7]'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
       {/* ─── Product Grid ─── */}
       <div className="max-w-7xl mx-auto px-6 pb-16">
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="animate-spin text-[#7A6051]" size={24} />
           </div>
-        ) : products.length === 0 ? (
+        ) : visibleProducts.length === 0 ? (
           <div className="text-center py-20">
             <ImageIcon className="mx-auto text-[#7A6051]/30 mb-4" size={48} />
-            <p className="font-sans text-[#7A6051] mb-4">Nenhum produto cadastrado ainda.</p>
+            <p className="font-sans text-[#7A6051] mb-4">Nenhum produto encontrado nesta categoria.</p>
             <button
-              onClick={() => { resetForm(); setShowForm(true); }}
+              onClick={() => { resetForm(); setShowForm(true); setFormData(f => ({ ...f, category: selectedAdminCategory !== 'Todas' ? selectedAdminCategory : 'Blusas' })); }}
               className="font-sans text-xs uppercase tracking-wider text-[#1F1B18] underline underline-offset-4 hover:no-underline"
             >
-              Adicionar primeiro produto
+              Adicionar produto
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-5 gap-y-10">
-            {products.map((product, index) => (
+            {visibleProducts.map((product, index) => (
               <div 
                 key={product.id} 
                 className={`group relative transition-transform cursor-grab active:cursor-grabbing ${draggedIndex === index ? 'opacity-50' : ''} ${dragOverIndex === index ? 'scale-105 ring-2 ring-[#7A6051]' : ''}`}
