@@ -285,14 +285,17 @@ export default function AdminPage() {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
 
-    // Auto-scroll da tela ao chegar perto das bordas durante o arrasto
-    const scrollMargin = 120; // distância da borda para ativar
-    const scrollSpeed = 25; // velocidade do scroll
-
+    // Auto-scroll dinâmico, rápido e fluido
+    const scrollMargin = 200; // Começa a rolar mais cedo
+    
     if (e.clientY < scrollMargin) {
-      window.scrollBy(0, -scrollSpeed);
+      // Quanto mais perto do topo, mais rápido (até 60px por tick)
+      const speed = Math.max(15, 60 * (1 - e.clientY / scrollMargin));
+      window.scrollBy(0, -speed);
     } else if (window.innerHeight - e.clientY < scrollMargin) {
-      window.scrollBy(0, scrollSpeed);
+      // Quanto mais perto do fundo, mais rápido
+      const speed = Math.max(15, 60 * (1 - (window.innerHeight - e.clientY) / scrollMargin));
+      window.scrollBy(0, speed);
     }
   };
 
