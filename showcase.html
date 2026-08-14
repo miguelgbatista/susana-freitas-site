@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Susana Freitas Store | Cinematic Showcase</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        :root {
+            --brand-espresso: #2F2622;
+            --brand-mocha: #7A6051;
+            --brand-pearl: #FBF8F4;
+            --glow-color: rgba(122, 96, 81, 0.4);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: radial-gradient(circle at center, #3d342f 0%, #1a1614 100%);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            perspective: 2000px;
+            font-family: serif;
+        }
+
+        /* Ambient Glow Layers */
+        .ambient-glow {
+            position: absolute;
+            width: 150vw;
+            height: 150vh;
+            background: radial-gradient(circle, rgba(122, 96, 81, 0.1) 0%, transparent 70%);
+            filter: blur(80px);
+            z-index: 1;
+            animation: pulse 10s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulse {
+            from { opacity: 0.3; transform: scale(1); }
+            to { opacity: 0.6; transform: scale(1.1); }
+        }
+
+        /* 3D Container */
+        .stage {
+            position: relative;
+            width: 80vw;
+            height: 80vh;
+            max-width: 1400px;
+            max-height: 800px;
+            transform-style: preserve-3d;
+            z-index: 10;
+        }
+
+        /* The "Device" / Floating Screen */
+        .screen-container {
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            border-radius: 2px;
+            overflow: hidden;
+            box-shadow: 
+                0 50px 100px -20px rgba(0,0,0,0.5),
+                0 30px 60px -30px rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.1);
+            transform: rotateY(-15deg) rotateX(10deg);
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: var(--brand-pearl);
+        }
+
+        /* Lens Flare Effect */
+        .flare {
+            position: absolute;
+            top: -20%;
+            left: -10%;
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+            filter: blur(40px);
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        /* Shine Overlay */
+        .shine-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                135deg,
+                rgba(255,255,255,0) 0%,
+                rgba(255,255,255,0.1) 50%,
+                rgba(255,255,255,0) 100%
+            );
+            z-index: 15;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        /* Title Card */
+        .overlay-text {
+            position: absolute;
+            bottom: 50px;
+            left: 50px;
+            color: #fff;
+            z-index: 30;
+            opacity: 0;
+        }
+
+        .overlay-text h1 {
+            font-size: 3rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            font-weight: 300;
+        }
+
+        /* Progress Bar */
+        .loading-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 2px;
+            background: var(--brand-mocha);
+            width: 0%;
+            z-index: 40;
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow"></div>
+    <div class="flare"></div>
+    
+    <div class="stage">
+        <div class="screen-container">
+            <div class="shine-overlay"></div>
+            <iframe id="site" src="https://susanafreitasstore.com.br/"></iframe>
+        </div>
+    </div>
+
+    <div class="overlay-text">
+        <p style="font-size: 0.8rem; letter-spacing: 0.5em; margin-bottom: 10px; color: var(--brand-mocha);">APRESENTAÇÃO EXCLUSIVA</p>
+        <h1>Susana Freitas</h1>
+    </div>
+
+    <div class="loading-bar"></div>
+
+    <script>
+        window.onload = () => {
+            const tl = gsap.timeline({ repeat: -1 });
+            const screen = document.querySelector('.screen-container');
+            const shine = document.querySelector('.shine-overlay');
+            const text = document.querySelector('.overlay-text');
+            const flare = document.querySelector('.flare');
+            const iframe = document.getElementById('site');
+
+            // Initial State
+            gsap.set(screen, { rotationY: -45, rotationX: 20, scale: 0.8, opacity: 0 });
+            gsap.set(text, { y: 20, opacity: 0 });
+
+            // 1. Entrance
+            tl.to(screen, { 
+                opacity: 1, 
+                rotationY: -15, 
+                rotationX: 5, 
+                scale: 1, 
+                duration: 2.5, 
+                ease: "power2.inOut" 
+            })
+            .to(text, { opacity: 1, y: 0, duration: 1.5, ease: "power2.out" }, "-=1")
+            
+            // 2. Slow Pan & Shine
+            .to(screen, { 
+                rotationY: 15, 
+                duration: 8, 
+                ease: "none" 
+            }, "pan")
+            .to(shine, { 
+                opacity: 0.3, 
+                duration: 2, 
+                repeat: 3, 
+                yoyo: true, 
+                ease: "sine.inOut" 
+            }, "pan")
+            .to(flare, {
+                x: "100%",
+                y: "50%",
+                duration: 8,
+                ease: "sine.inOut"
+            }, "pan")
+
+            // 3. Zoom In to Catalog Section (Simulating Scroll)
+            .to(screen, {
+                scale: 1.8,
+                x: "-10%",
+                y: "-20%",
+                rotationY: 5,
+                rotationX: 0,
+                duration: 4,
+                ease: "power3.inOut"
+            })
+            
+            // 4. Subtle "Breathing" Movement
+            .to(screen, {
+                y: "+=20",
+                duration: 2,
+                repeat: 1,
+                yoyo: true,
+                ease: "sine.inOut"
+            })
+
+            // 5. Rotate & Zoom Out
+            .to(screen, {
+                rotationY: -30,
+                scale: 0.9,
+                x: 0,
+                y: 0,
+                duration: 4,
+                ease: "power2.inOut"
+            })
+
+            // 6. Reset Loop
+            .to(screen, { opacity: 0, duration: 1 });
+        };
+    </script>
+</body>
+</html>

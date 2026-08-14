@@ -110,6 +110,10 @@ export default function AdminPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  // ─── Drag and Drop ───
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+
   // ─── Toast ───
   const [toast, setToast] = useState(null);
 
@@ -254,6 +258,64 @@ export default function AdminPage() {
     setDeleting(false);
     fetchProducts();
   };
+
+  // ─── Drag and Drop Handlers ───
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => setDragOverIndex(index), 0);
+  };
+
+  const handleDragEnter = (e, index) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = async (e, dropIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      handleDragEnd();
+      return;
+    }
+
+    const newProducts = [...products];
+    const draggedItem = newProducts[draggedIndex];
+    newProducts.splice(draggedIndex, 1);
+    newProducts.splice(dropIndex, 0, draggedItem);
+
+    const updatedProducts = newProducts.map((p, i) => ({
+      ...p,
+      sort_order: i
+    }));
+
+    setProducts(updatedProducts);
+    setDragOverIndex(null);
+    setDraggedIndex(null);
+    showToast('Salvando nova ordem...');
+
+    try {
+      await Promise.all(
+        updatedProducts.map(p =>
+          supabase.from('produtos').update({ sort_order: p.sort_order }).eq('id', p.id)
+        )
+      );
+      showToast('Ordem atualizada com sucesso!');
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao atualizar a ordem.', 'error');
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -281,8 +343,8 @@ export default function AdminPage() {
         if (error) throw error;
         showToast('Produto atualizado com sucesso!');
       } else {
-        const maxOrder = products.length > 0
-          ? Math.max(...products.map(p => p.sort_order || 0))
+        const minOrder = products.length > 0
+          ? Math.min(...products.map(p => p.sort_order || 0))
           : 0;
 
         const { error } = await supabase
@@ -294,7 +356,7 @@ export default function AdminPage() {
             category: formData.category,
             is_opportunity: formData.is_opportunity,
             image_url: imageUrl,
-            sort_order: maxOrder + 1,
+            sort_order: minOrder - 1,
           });
 
         if (error) throw error;
@@ -490,8 +552,17 @@ export default function AdminPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-5 gap-y-10">
-            {products.map((product) => (
-              <div key={product.id} className="group relative">
+            {products.map((product, index) => (
+              <div 
+                key={product.id} 
+                className={`group relative transition-transform cursor-grab active:cursor-grabbing ${draggedIndex === index ? 'opacity-50' : ''} ${dragOverIndex === index ? 'scale-105 ring-2 ring-[#7A6051]' : ''}`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragEnter={(e) => handleDragEnter(e, index)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+              >
                 {/* Image */}
                 <div className="relative aspect-[3/4] bg-[#EAE1D7] overflow-hidden mb-3">
                   {product.is_opportunity && (
