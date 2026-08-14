@@ -284,6 +284,16 @@ export default function AdminPage() {
   const handleDragOver = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+
+    // Auto-scroll da tela ao chegar perto das bordas durante o arrasto
+    const scrollMargin = 120; // distância da borda para ativar
+    const scrollSpeed = 25; // velocidade do scroll
+
+    if (e.clientY < scrollMargin) {
+      window.scrollBy(0, -scrollSpeed);
+    } else if (window.innerHeight - e.clientY < scrollMargin) {
+      window.scrollBy(0, scrollSpeed);
+    }
   };
 
   const handleDragEnd = () => {
