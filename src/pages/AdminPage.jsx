@@ -1,6 +1,95 @@
 import { useState, useEffect } from 'react';
 import { supabase, ADMIN_PASSWORD } from '../lib/supabase';
 import { Plus, Trash2, Pencil, X, Upload, LogOut, Save, ImageIcon, Loader2, Check, AlertTriangle } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+function SortableProduct({ product, startEdit, setDeleteConfirm }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: product.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0 : 1, // Torna o item invisível onde estava, dnd-kit mostra a animação do movimento
+    zIndex: isDragging ? 50 : 'auto',
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="group relative cursor-grab active:cursor-grabbing">
+      {/* Image */}
+      <div className="relative aspect-[3/4] bg-[#EAE1D7] overflow-hidden mb-3">
+        {product.is_opportunity && (
+          <span className="absolute top-2 right-2 z-10 bg-[#6E2F3A] text-white font-sans text-[9px] uppercase tracking-widest px-2 py-0.5 rounded shadow-sm font-medium">
+            Oportunidade
+          </span>
+        )}
+        {product.image_url ? (
+          <img
+            src={product.image_url}
+            alt={product.name}
+            className="w-full h-full object-cover object-top pointer-events-none"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <ImageIcon className="text-[#7A6051]/20" size={32} />
+          </div>
+        )}
+
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-[#1F1B18]/0 group-hover:bg-[#1F1B18]/60 transition-all duration-300 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100">
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); startEdit(product); }}
+            className="bg-white text-[#1F1B18] p-3 hover:bg-[#F7F3EE] transition-colors"
+            title="Editar"
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); setDeleteConfirm(product.id); }}
+            className="bg-white text-red-600 p-3 hover:bg-red-50 transition-colors"
+            title="Excluir"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Info */}
+      <h3 className="font-serif text-sm text-[#1F1B18] leading-snug line-clamp-2">{product.name}</h3>
+      {product.original_price ? (
+        <p className="font-sans text-xs mt-1 flex items-center gap-1.5">
+          <span className="line-through text-[#7A6051]/50">{product.original_price}</span>
+          <span className="text-[#1F1B18] font-medium">{product.price}</span>
+        </p>
+      ) : (
+        <p className="font-sans text-xs text-[#7A6051] mt-1">{product.price}</p>
+      )}
+    </div>
+  );
+}
 
 export default function AdminPage() {
   // ─── Auth ───
@@ -110,10 +199,6 @@ export default function AdminPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  // ─── Drag and Drop ───
-  const [draggedIndex, setDraggedIndex] = useState(null);
-  const [dragOverIndex, setDragOverIndex] = useState(null);
-
   // ─── Toast ───
   const [toast, setToast] = useState(null);
 
@@ -121,6 +206,18 @@ export default function AdminPage() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  // ─── Sensors (dnd-kit) ───
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // ─── Tabs ───
   const [activeTab, setActiveTab] = useState('catalog'); // 'catalog' | 'home'
@@ -269,81 +366,42 @@ export default function AdminPage() {
     fetchProducts();
   };
 
-  // ─── Drag and Drop Handlers ───
-  const handleDragStart = (e, index) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => setDragOverIndex(index), 0);
-  };
-
-  const handleDragEnter = (e, index) => {
-    e.preventDefault();
-    setDragOverIndex(index);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-
-    // Auto-scroll dinâmico, rápido e fluido
-    const scrollMargin = 200; // Começa a rolar mais cedo
+  // ─── Drag and Drop Handlers (dnd-kit) ───
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
     
-    if (e.clientY < scrollMargin) {
-      // Quanto mais perto do topo, mais rápido (até 60px por tick)
-      const speed = Math.max(15, 60 * (1 - e.clientY / scrollMargin));
-      window.scrollBy(0, -speed);
-    } else if (window.innerHeight - e.clientY < scrollMargin) {
-      // Quanto mais perto do fundo, mais rápido
-      const speed = Math.max(15, 60 * (1 - (window.innerHeight - e.clientY) / scrollMargin));
-      window.scrollBy(0, speed);
-    }
-  };
+    if (active && over && active.id !== over.id) {
+      const oldIndex = visibleProducts.findIndex(p => p.id === active.id);
+      const newIndex = visibleProducts.findIndex(p => p.id === over.id);
 
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  };
+      const newVisibleProducts = arrayMove(visibleProducts, oldIndex, newIndex);
+      
+      const originalSortOrders = visibleProducts.map(p => p.sort_order || 0).sort((a, b) => a - b);
 
-  const handleDrop = async (e, dropIndex) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === dropIndex) {
-      handleDragEnd();
-      return;
-    }
+      const updatedVisibleProducts = newVisibleProducts.map((p, i) => ({
+        ...p,
+        sort_order: originalSortOrders[i]
+      }));
 
-    const newVisibleProducts = [...visibleProducts];
-    const draggedItem = newVisibleProducts[draggedIndex];
-    newVisibleProducts.splice(draggedIndex, 1);
-    newVisibleProducts.splice(dropIndex, 0, draggedItem);
+      const updatedProductsMap = new Map(updatedVisibleProducts.map(p => [p.id, p]));
+      const finalProducts = products.map(p => updatedProductsMap.has(p.id) ? updatedProductsMap.get(p.id) : p);
+      
+      finalProducts.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
-    const originalSortOrders = visibleProducts.map(p => p.sort_order || 0).sort((a, b) => a - b);
+      setProducts(finalProducts);
+      showToast('Salvando nova ordem...');
 
-    const updatedVisibleProducts = newVisibleProducts.map((p, i) => ({
-      ...p,
-      sort_order: originalSortOrders[i]
-    }));
-
-    const updatedProductsMap = new Map(updatedVisibleProducts.map(p => [p.id, p]));
-    const finalProducts = products.map(p => updatedProductsMap.has(p.id) ? updatedProductsMap.get(p.id) : p);
-    
-    // Sort finalProducts by sort_order just to be safe
-    finalProducts.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
-    setProducts(finalProducts);
-    setDragOverIndex(null);
-    setDraggedIndex(null);
-    showToast('Salvando nova ordem...');
-
-    try {
-      await Promise.all(
-        updatedVisibleProducts.map(p =>
-          supabase.from('produtos').update({ sort_order: p.sort_order }).eq('id', p.id)
-        )
-      );
-      showToast('Ordem atualizada com sucesso!');
-    } catch (err) {
-      console.error(err);
-      showToast('Erro ao atualizar a ordem.', 'error');
+      try {
+        await Promise.all(
+          updatedVisibleProducts.map(p =>
+            supabase.from('produtos').update({ sort_order: p.sort_order }).eq('id', p.id)
+          )
+        );
+        showToast('Ordem atualizada com sucesso!');
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao atualizar a ordem.', 'error');
+      }
     }
   };
 
@@ -599,69 +657,27 @@ export default function AdminPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-5 gap-y-10">
-            {visibleProducts.map((product, index) => (
-              <div 
-                key={product.id} 
-                className={`group relative transition-transform cursor-grab active:cursor-grabbing ${draggedIndex === index ? 'opacity-50' : ''} ${dragOverIndex === index ? 'scale-105 ring-2 ring-[#7A6051]' : ''}`}
-                draggable
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragEnter={(e) => handleDragEnter(e, index)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, index)}
-                onDragEnd={handleDragEnd}
-              >
-                {/* Image */}
-                <div className="relative aspect-[3/4] bg-[#EAE1D7] overflow-hidden mb-3">
-                  {product.is_opportunity && (
-                    <span className="absolute top-2 right-2 z-10 bg-[#6E2F3A] text-white font-sans text-[9px] uppercase tracking-widest px-2 py-0.5 rounded shadow-sm font-medium">
-                      Oportunidade
-                    </span>
-                  )}
-                  {product.image_url ? (
-                    <img
-                      src={product.image_url}
-                      alt={product.name}
-                      className="w-full h-full object-cover object-top"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageIcon className="text-[#7A6051]/20" size={32} />
-                    </div>
-                  )}
-
-                  {/* Hover overlay */}
-                  <div className="absolute inset-0 bg-[#1F1B18]/0 group-hover:bg-[#1F1B18]/60 transition-all duration-300 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100">
-                    <button
-                      onClick={() => startEdit(product)}
-                      className="bg-white text-[#1F1B18] p-3 hover:bg-[#F7F3EE] transition-colors"
-                      title="Editar"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirm(product.id)}
-                      className="bg-white text-red-600 p-3 hover:bg-red-50 transition-colors"
-                      title="Excluir"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Info */}
-                <h3 className="font-serif text-sm text-[#1F1B18] leading-snug line-clamp-2">{product.name}</h3>
-                {product.original_price ? (
-                  <p className="font-sans text-xs mt-1 flex items-center gap-1.5">
-                    <span className="line-through text-[#7A6051]/50">{product.original_price}</span>
-                    <span className="text-[#1F1B18] font-medium">{product.price}</span>
-                  </p>
-                ) : (
-                  <p className="font-sans text-xs text-[#7A6051] mt-1">{product.price}</p>
-                )}
+          <DndContext 
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext 
+              items={visibleProducts.map(p => p.id)}
+              strategy={rectSortingStrategy}
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-5 gap-y-10">
+                {visibleProducts.map((product) => (
+                  <SortableProduct 
+                    key={product.id} 
+                    product={product} 
+                    startEdit={startEdit} 
+                    setDeleteConfirm={setDeleteConfirm} 
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
